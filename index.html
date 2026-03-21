@@ -21,7 +21,7 @@
     --text-secondary: #6B6B6B;
     --text-tertiary: #9B9B9B;
     --border: #E8E8E6;
-    --shadow-card: 0 4px 20px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.05);
+    --shadow-card: 0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
     --shadow-marker: 0 2px 8px rgba(0,0,0,0.18);
     --radius-card: 16px;
     --app-font: 'Geist';
@@ -156,32 +156,30 @@
   .tog.right::after { transform: translateX(12px); }
   .topbar-div { width: 1px; height: 16px; background: rgba(0,0,0,0.12); }
 
-  /* ── LOGO TOOLTIP ── */
-  #logo-tooltip {
-    position: fixed;
-    left: 64px; top: 16px;
-    width: 280px;
-    background: var(--white);
+  /* ── INFO MODAL ── */
+  #info-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.25);
+    z-index: 500; align-items: center; justify-content: center;
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  }
+  #info-overlay.visible { display: flex; animation: fadeIn 0.15s ease; }
+  #info-modal {
+    background: var(--white); border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.04);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: var(--shadow-card);
-    padding: 16px;
-    opacity: 0; pointer-events: none;
-    transform: translateX(-6px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    z-index: 1000;
+    width: 380px; padding: 28px;
+    animation: cardIn 0.18s ease;
   }
-  #logo-tooltip.visible {
-    opacity: 1; pointer-events: none;
-    transform: translateX(0);
+  .info-title {
+    font-size: 30px; font-weight: 800;
+    font-family: 'Geist Mono', monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
-  .tooltip-title {
-    font-size: 16px; font-weight: 600;
-    color: var(--text-primary); margin-bottom: 6px;
-  }
-  .tooltip-text {
-    font-size: 12px; color: var(--text-secondary);
-    line-height: 1.6; font-weight: 400;
+  .info-text {
+    font-size: 14px; color: var(--text-secondary);
+    line-height: 1.65; margin-top: 8px;
   }
   #settings-overlay {
     display: none; position: fixed; inset: 0;
@@ -242,19 +240,22 @@
   /* ── FLOATING CARD — positioned 32px inside the map edges ── */
   #card {
     position: absolute;
-    top: 48px; /* 16px page edge + 32px inside map */
-    left: 108px; /* 76px nav offset + 32px inside map */
+    top: 48px;
+    left: 108px;
     width: 380px;
     background: var(--white);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
     border: 1px solid var(--border);
     z-index: 300; display: none;
+    cursor: grab;
+    user-select: none;
   }
-  #card.visible { display: block; animation: cardIn 0.18s ease; }
+  #card.dragging { cursor: grabbing; box-shadow: 0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06); }
+  #card.visible { display: block; animation: cardIn 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
   @keyframes cardIn {
-    from { opacity: 0; transform: translateY(-5px) scale(0.985); }
-    to   { opacity: 1; transform: none; }
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
   .card-close {
     position: absolute; top: 16px; right: 16px;
@@ -342,8 +343,10 @@
   #card-list { padding: 24px; display: none; }
   .lst-title { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; padding-right: 32px; }
   .lst-sub { font-size: 14px; color: var(--text-secondary); margin-top: 4px; margin-bottom: 20px; font-weight: 400; }
-  .t-list { display: flex; flex-direction: column; gap: 0; max-height: 520px; overflow-y: auto; }
-  .t-list::-webkit-scrollbar { width: 3px; }
+  .t-list { display: flex; flex-direction: column; gap: 0; max-height: 520px; overflow-y: auto; scrollbar-width: none; }
+  .t-list::-webkit-scrollbar { display: none; }
+  .t-list.scrolling::-webkit-scrollbar { display: block; width: 3px; }
+  .t-list.scrolling { scrollbar-width: thin; }
   .t-list::-webkit-scrollbar-thumb { background: #E0E0E0; border-radius: 2px; }
   .t-row {
     display: flex; align-items: center; gap: 14px;
@@ -352,7 +355,7 @@
   }
   .t-row:hover { background: #F7F7F7; }
   .t-row.active { background: var(--blue-light); border-color: var(--blue-border); }
-  .t-av { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  .t-av { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
   .t-info { flex: 1; min-width: 0; }
   .t-name { font-size: 15px; font-weight: 700; color: var(--text-primary); line-height: 1.3; }
   .t-loc {
@@ -368,8 +371,12 @@
   /* ── AVATAR MARKERS ── */
   .av-marker {
     display: flex; flex-direction: column; align-items: center;
-    cursor: pointer; will-change: transform;
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.28s ease;
   }
+  .av-marker.faded { opacity: 0; pointer-events: none; }
+
   .av-wrap {
     width: 38px; height: 38px; border-radius: 50%;
     box-shadow: 0 0 0 1px #E9E9E9, var(--shadow-marker);
@@ -389,24 +396,23 @@
     font-size: 12px; font-weight: 600; font-family: var(--app-font), sans-serif;
   }
   .av-name {
-    margin-top: 3px; font-size: 11px; font-weight: 600;
+    margin-top: 3px; font-size: 12px; font-weight: 600;
     color: #333; font-family: var(--app-font), sans-serif; white-space: nowrap;
     -webkit-text-stroke: 3px white; paint-order: stroke fill;
   }
 
-  /* Cluster */
+  /* ── CLUSTER BUBBLES ── */
   .clust {
     width: 36px; height: 36px; border-radius: 50%;
     background: var(--blue); box-shadow: var(--shadow-marker);
     display: flex; align-items: center; justify-content: center;
     color: white; font-size: 13px; font-weight: 600;
-    font-family: var(--app-font), sans-serif; cursor: pointer; will-change: transform;
+    font-family: var(--app-font), sans-serif; cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.28s ease;
   }
   .clust:hover { background: #0079e0; }
-
-  /* Opacity transitions — reliable fade on Mapbox markers */
-  .av-marker { opacity: 1; transition: opacity 0.3s ease; }
-  .clust { opacity: 1; transition: opacity 0.3s ease; }
+  .clust.faded { opacity: 0; pointer-events: none; }
 
   @keyframes pulseRing {
     0%   { box-shadow: 0 0 0 0 rgba(0,139,255,0.5), var(--shadow-marker); }
@@ -422,7 +428,7 @@
 
 <!-- NAV — no container, floats on white bg -->
 <nav id="nav">
-  <div class="nav-logo" onmouseenter="logoHover()" onmouseleave="logoReset()">
+  <div class="nav-logo" onmouseenter="logoHover()" onmouseleave="logoReset()" onclick="navClick('home')" title="Home">
     <svg width="28" height="46" viewBox="0 0 28 46" fill="none" xmlns="http://www.w3.org/2000/svg">
       <!-- I -->
       <path d="M11.2046 32.7932V29.0584H15.7273V15.8113H11.2046V12.0764H24.3933V15.8113H19.8707V29.0584H24.3933V32.7932H11.2046Z" fill="#313131"/>
@@ -441,23 +447,29 @@
     <button class="nav-btn" id="nav-team" title="Team List" onclick="navClick('team')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </button>
-    <button class="nav-btn" id="nav-cal" title="Upcoming Trips" onclick="navClick('cal')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-    </button>
     <button class="nav-btn" id="nav-settings" title="Settings" onclick="openSettings()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <button class="nav-btn" id="nav-info" title="Info" onclick="openInfo()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
     </button>
   </div>
   <div class="nav-spacer"></div>
   <div class="nav-version">V1.0</div>
 </nav>
 
-<!-- LOGO TOOLTIP — outside nav so z-index works correctly -->
-<div id="logo-tooltip">
-  <div class="tooltip-title">Isotope</div>
-  <div class="tooltip-text">An isotope is a variant of a chemical element that has the same number of protons (and electrons) but a different number of neutrons in its nucleus. While they share near-identical chemical properties, isotopes of an element have different physical properties, such as mass.</div>
-  <div class="tooltip-text" style="margin-top:10px;">Click on a team member to view more details. Then hold SHIFT and click on another one to see how far away they are.</div>
+<!-- INFO MODAL -->
+<div id="info-overlay" onclick="handleInfoOverlayClick(event)">
+  <div id="info-modal">
+    <div class="settings-header">
+      <div class="info-title">ISOTOPE</div>
+      <button class="settings-close" onclick="closeInfo()">&#x2715;</button>
+    </div>
+    <p class="info-text">An isotope is a variant of a chemical element that has the same number of protons (and electrons) but a different number of neutrons in its nucleus. While they share near-identical chemical properties, isotopes of an element have different physical properties, such as mass.</p>
+    <p class="info-text" style="margin-top:12px;"><em>Website created by Nico & Claude for my Atomic Friends around the world.</em></p>
+  </div>
 </div>
+
 <div id="topbar">
   <div id="search-wrap">
     <div class="search-icon">
@@ -599,7 +611,7 @@
     <div class="cmp-close-hint">Click anywhere on the map to close the comparison tool</div>
   </div>
   <div id="card-list">
-    <div class="lst-title">Isotope</div>
+    <div class="lst-title">Atomic Health</div>
     <div class="lst-sub" id="lst-sub"></div>
     <div class="t-list" id="t-list"></div>
   </div>
@@ -685,27 +697,12 @@ map.on('load', () => {
     if (e.originalEvent.target === map.getCanvas() && cardMode === 'compare') closeCard();
   });
 
-  // Use zoomend instead of zoom — fires once when zoom settles,
-  // so fade in/out animations aren't interrupted mid-transition
-  let lastBand = getZoomBand(map.getZoom());
-  map.on('zoomend', () => {
-    const band = getZoomBand(map.getZoom());
-    if (band !== lastBand) { lastBand = band; updateClusters(); }
-  });
+  map.on('zoomend', updateClusters);
 });
-
-// Returns a discrete "band" string based on which cluster thresholds are active
-function getZoomBand(zoom) {
-  if (zoom >= 5)   return 'individual';
-  if (zoom >= 3.5) return 'close';
-  if (zoom >= 2.5) return 'medium';
-  return 'far';
-}
-
 
 // ── MARKERS ──
 // Avatar markers are created ONCE on load and never removed.
-// Showing/hiding is done via CSS display — no DOM teardown, no flicker.
+// Visibility is controlled purely via opacity — no display toggling, no flicker.
 // Only cluster markers are recreated when groupings change.
 
 function initMarkers() {
@@ -715,14 +712,14 @@ function initMarkers() {
 
 function mkAvatar(p) {
   const el = document.createElement('div');
-  el.className = 'av-marker';
-  el.style.opacity = '1';
+  el.className = 'av-marker faded'; // start invisible; updateClusters will reveal
   const inner = p.avatar
     ? `<img src="${p.avatar}" alt="${p.firstName}" loading="lazy">`
     : `<div class="av-initials">${p.initials}</div>`;
   el.innerHTML = `<div class="av-wrap">${inner}</div><div class="av-name">${p.firstName}</div>`;
   el.addEventListener('click', e => {
     e.stopPropagation();
+    if (el.classList.contains('faded')) return;
     shiftHeld && selectedId && selectedId !== p.id
       ? triggerCompare(p.id) : selectPerson(p.id);
   });
@@ -730,8 +727,6 @@ function mkAvatar(p) {
     .setLngLat(p.coords).addTo(map);
   avMarkers[p.id] = { marker, el };
 }
-
-// Cluster groupings — only recreate cluster bubbles when groupings change
 let lastClusterKey = '';
 
 function clusterKey(groups) {
@@ -748,48 +743,32 @@ function updateClusters() {
   const clusteredIds = new Set();
   groups.forEach(g => { if (g.length > 1) g.forEach(p => clusteredIds.add(p.id)); });
 
-  // Fade out and remove old cluster bubbles
+  // Fade out old cluster bubbles, self-destruct after transition
   clustMkrs.forEach(m => {
     const el = m.getElement();
-    el.style.opacity = '0';
+    el.classList.add('faded');
     setTimeout(() => m.remove(), 300);
   });
   clustMkrs = [];
 
-  // Fade avatars in/out
+  // Toggle avatar visibility — CSS transition handles the fade
   TEAM.forEach(p => {
     const el = avMarkers[p.id]?.el;
     if (!el) return;
-    const shouldHide = clusteredIds.has(p.id);
-    const isHidden = el.style.display === 'none';
-
-    if (shouldHide && !isHidden) {
-      // Fade out then hide
-      el.style.opacity = '0';
-      setTimeout(() => { el.style.display = 'none'; }, 300);
-    } else if (!shouldHide && isHidden) {
-      // Show at opacity 0, then fade in on next frame
-      el.style.opacity = '0';
-      el.style.display = 'flex';
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => { el.style.opacity = '1'; });
-      });
-    }
+    clusteredIds.has(p.id) ? el.classList.add('faded') : el.classList.remove('faded');
   });
 
-  // Create new clusters: insert at opacity 0, fade in on next frame
-  setTimeout(() => {
-    groups.forEach(g => { if (g.length > 1) mkCluster(g); });
-    if (selectedId && avMarkers[selectedId]) avMarkers[selectedId].el.classList.add('selected');
-    if (compareId  && avMarkers[compareId])  avMarkers[compareId].el.classList.add('selected');
-  }, 50);
-}
+  // Create new clusters immediately (no setTimeout — avoids race conditions)
+  // Each starts faded and fades in via double RAF
+  groups.forEach(g => { if (g.length > 1) mkCluster(g); });
 
+  if (selectedId && avMarkers[selectedId]) avMarkers[selectedId].el.classList.add('selected');
+  if (compareId  && avMarkers[compareId])  avMarkers[compareId].el.classList.add('selected');
+}
 
 function mkCluster(group) {
   const el = document.createElement('div');
-  el.className = 'clust';
-  el.style.opacity = '0';
+  el.className = 'clust faded';
   el.textContent = group.length;
   el.addEventListener('click', e => {
     e.stopPropagation();
@@ -802,10 +781,8 @@ function mkCluster(group) {
   const m = new mapboxgl.Marker({ element: el, anchor: 'center' })
     .setLngLat([lng, lat]).addTo(map);
   clustMkrs.push(m);
-  // Fade in on next frame after DOM insertion
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => { el.style.opacity = '1'; });
-  });
+  // Double RAF: first frame lets browser paint the faded state, second triggers the transition
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('faded')));
 }
 
 function cluster(team, zoom) {
@@ -997,7 +974,9 @@ function syncListActive(id) {
 }
 
 function closeCard() {
-  document.getElementById('card').classList.remove('visible');
+  const card = document.getElementById('card');
+  card.classList.remove('visible');
+  card.style.left = ''; card.style.top = ''; // reset drag position
   if (selectedId && avMarkers[selectedId]) avMarkers[selectedId].el.classList.remove('selected');
   if (compareId  && avMarkers[compareId])  avMarkers[compareId].el.classList.remove('selected');
   if (hasCmpLine) removeCmpLine();
@@ -1166,11 +1145,65 @@ function logoHover() {
   const digits = [0,1,3,4,5,6,7,8,9];
   const d = digits[Math.floor(Math.random() * digits.length)];
   document.getElementById('logo-2-text').textContent = d;
-  document.getElementById('logo-tooltip').classList.add('visible');
 }
 function logoReset() {
   document.getElementById('logo-2-text').textContent = '2';
-  document.getElementById('logo-tooltip').classList.remove('visible');
+}
+
+// ── DRAG ──
+(function() {
+  const card = document.getElementById('card');
+  let dragging = false, startX, startY, origLeft, origTop;
+
+  card.addEventListener('mousedown', e => {
+    // Don't drag if clicking a button, input or interactive element
+    if (e.target.closest('button, input, a, .tog, .av-marker')) return;
+    dragging = true;
+    card.classList.add('dragging');
+    const rect = card.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    origLeft = rect.left; origTop = rect.top;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    card.style.left = (origLeft + dx) + 'px';
+    card.style.top  = (origTop  + dy) + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove('dragging');
+  });
+})();
+
+// ── SCROLLBAR — show on scroll, hide after idle ──
+(function() {
+  const list = document.getElementById('t-list');
+  if (!list) return;
+  let hideTimer;
+  list.addEventListener('scroll', () => {
+    list.classList.add('scrolling');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => list.classList.remove('scrolling'), 1000);
+  });
+})();
+function openInfo() {
+  document.getElementById('info-overlay').classList.add('visible');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-info').classList.add('active');
+}
+function closeInfo() {
+  document.getElementById('info-overlay').classList.remove('visible');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-home').classList.add('active');
+}
+function handleInfoOverlayClick(e) {
+  if (e.target === document.getElementById('info-overlay')) closeInfo();
 }
 </script>
 </body>
