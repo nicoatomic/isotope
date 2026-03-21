@@ -371,12 +371,8 @@
   /* ── AVATAR MARKERS ── */
   .av-marker {
     display: flex; flex-direction: column; align-items: center;
-    cursor: pointer;
-    opacity: 1;
-    transition: opacity 0.28s ease;
+    cursor: pointer; will-change: transform;
   }
-  .av-marker.faded { opacity: 0; pointer-events: none; }
-
   .av-wrap {
     width: 38px; height: 38px; border-radius: 50%;
     box-shadow: 0 0 0 1px #E9E9E9, var(--shadow-marker);
@@ -407,12 +403,9 @@
     background: var(--blue); box-shadow: var(--shadow-marker);
     display: flex; align-items: center; justify-content: center;
     color: white; font-size: 13px; font-weight: 600;
-    font-family: var(--app-font), sans-serif; cursor: pointer;
-    opacity: 1;
-    transition: opacity 0.28s ease;
+    font-family: var(--app-font), sans-serif; cursor: pointer; will-change: transform;
   }
   .clust:hover { background: #0079e0; }
-  .clust.faded { opacity: 0; pointer-events: none; }
 
   @keyframes pulseRing {
     0%   { box-shadow: 0 0 0 0 rgba(0,139,255,0.5), var(--shadow-marker); }
@@ -697,29 +690,35 @@ map.on('load', () => {
     if (e.originalEvent.target === map.getCanvas() && cardMode === 'compare') closeCard();
   });
 
-  map.on('zoomend', updateClusters);
+  let lastBand = getZoomBand(map.getZoom());
+  map.on('zoomend', () => {
+    const band = getZoomBand(map.getZoom());
+    if (band !== lastBand) { lastBand = band; updateClusters(); }
+  });
 });
 
+function getZoomBand(zoom) {
+  if (zoom >= 5)   return 'individual';
+  if (zoom >= 3.5) return 'close';
+  if (zoom >= 2.5) return 'medium';
+  return 'far';
+}
+
 // ── MARKERS ──
-// Avatar markers are created ONCE on load and never removed.
-// Visibility is controlled purely via opacity — no display toggling, no flicker.
-// Only cluster markers are recreated when groupings change.
 
 function initMarkers() {
-  // Create every avatar marker once
   TEAM.forEach(p => mkAvatar(p));
 }
 
 function mkAvatar(p) {
   const el = document.createElement('div');
-  el.className = 'av-marker faded'; // start invisible; updateClusters will reveal
+  el.className = 'av-marker';
   const inner = p.avatar
     ? `<img src="${p.avatar}" alt="${p.firstName}" loading="lazy">`
     : `<div class="av-initials">${p.initials}</div>`;
   el.innerHTML = `<div class="av-wrap">${inner}</div><div class="av-name">${p.firstName}</div>`;
   el.addEventListener('click', e => {
     e.stopPropagation();
-    if (el.classList.contains('faded')) return;
     shiftHeld && selectedId && selectedId !== p.id
       ? triggerCompare(p.id) : selectPerson(p.id);
   });
@@ -727,6 +726,7 @@ function mkAvatar(p) {
     .setLngLat(p.coords).addTo(map);
   avMarkers[p.id] = { marker, el };
 }
+
 let lastClusterKey = '';
 
 function clusterKey(groups) {
@@ -743,23 +743,18 @@ function updateClusters() {
   const clusteredIds = new Set();
   groups.forEach(g => { if (g.length > 1) g.forEach(p => clusteredIds.add(p.id)); });
 
-  // Fade out old cluster bubbles, self-destruct after transition
-  clustMkrs.forEach(m => {
-    const el = m.getElement();
-    el.classList.add('faded');
-    setTimeout(() => m.remove(), 300);
-  });
+  // Remove old cluster bubbles
+  clustMkrs.forEach(m => m.remove());
   clustMkrs = [];
 
-  // Toggle avatar visibility — CSS transition handles the fade
+  // Show/hide avatars
   TEAM.forEach(p => {
     const el = avMarkers[p.id]?.el;
     if (!el) return;
-    clusteredIds.has(p.id) ? el.classList.add('faded') : el.classList.remove('faded');
+    el.style.display = clusteredIds.has(p.id) ? 'none' : 'flex';
   });
 
-  // Create new clusters immediately (no setTimeout — avoids race conditions)
-  // Each starts faded and fades in via double RAF
+  // Create new cluster bubbles
   groups.forEach(g => { if (g.length > 1) mkCluster(g); });
 
   if (selectedId && avMarkers[selectedId]) avMarkers[selectedId].el.classList.add('selected');
@@ -768,7 +763,7 @@ function updateClusters() {
 
 function mkCluster(group) {
   const el = document.createElement('div');
-  el.className = 'clust faded';
+  el.className = 'clust';
   el.textContent = group.length;
   el.addEventListener('click', e => {
     e.stopPropagation();
@@ -781,8 +776,6 @@ function mkCluster(group) {
   const m = new mapboxgl.Marker({ element: el, anchor: 'center' })
     .setLngLat([lng, lat]).addTo(map);
   clustMkrs.push(m);
-  // Double RAF: first frame lets browser paint the faded state, second triggers the transition
-  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('faded')));
 }
 
 function cluster(team, zoom) {
